@@ -30,7 +30,8 @@ def get_env_config(env_file=".env", logger=logging.getLogger(__name__)):
         logger.info("Env file not found.")
 
 
-async def maintainer(logger=logging.getLogger(__name__)):
+async def maintainer(logger=logging.getLogger(__name__), update_time=60):
+
     while True:
         logger.info("Update system config: started.")
         try:
@@ -46,12 +47,28 @@ async def maintainer(logger=logging.getLogger(__name__)):
             try:
                 results = db_operations.select_data("parameters")
                 for result in results:
-                    logger.info(f"Data in parameters: {result['id']}")
+                    os.environ[result['pkey']] = str(result['value'])
+                    logger.debug(f"Load {result['pkey']} is {str(result['value'])}")
             finally:
                 # Disconnect from the database
                 db_connector.disconnect()
-
         except Exception as e:
             logger.error(f"Error: {str(e)}")
+
+        try:
+            logger.setLevel(int(os.environ.get("LOG_LEVEL")) if os.environ.get("LOG_LEVEL") else logger.level)
+            logger.debug(f"Logging level set to {logging.getLevelName(logger.level)}")
+        except Exception as e:
+            logger.error(
+                f"Env 'LOG_LEVEL' is invalid '{os.environ.get('LOG_LEVEL')}', set a integer number CRITICAL = 50 | "
+                f"ERROR = 40 | WARNING = 30 | INFO = 20 | DEBUG = 10 | NOTSET = 0")
+
+        try:
+            update_time = int(os.environ.get('RELOAD_CONF')) if os.environ.get('RELOAD_CONF') else update_time
+            logger.debug(f"RELOAD_CONF is {update_time}s")
+        except Exception as e:
+            logger.error(
+                f"Env 'RELOAD_CONF' is invalid '{os.environ.get('RELOAD_CONF')}', set a integer number in seconds ")
+
         logger.info("Update system config: ended.")
-        time.sleep(60)
+        time.sleep(update_time)
